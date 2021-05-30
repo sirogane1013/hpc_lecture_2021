@@ -3,5 +3,5 @@
 #$ -l f_node=1
 #$ -l h_rt=0:01:00
 module purge
-module load cuda openmpi
-mpirun -np 16 ./cuda
+module load gcc intel-mpi
+mpirun -np 4 ./omp
