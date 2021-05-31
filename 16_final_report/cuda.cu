@@ -5,13 +5,20 @@
 #include <chrono>
 using namespace std;
 
+#define M 1024
 
 __global__ void submatmul(float *A, float *B, float *C, int N, int offset) {
-  int i = blockIdx.x + offset;
-  int j = threadIdx.x;
-  float sum = 0;
-  for (int k=0; k<N; k++) {
-    sum += A[N*i+k] * B[N*k+j];
+  int i = blockIdx.y + offset;
+  int j = threadIdx.x + blockDim.x * blockIdx.x;
+  float sum = 0.0f;
+  extern __shared__ float A_s[];
+  for (int ks=0; ks<N; ks+=blockDim.x) {
+    __syncthreads();
+    A_s[threadIdx.x] = A[N*i+ks+threadIdx.x];
+    __syncthreads();
+    for (int k=ks; k<ks+blockDim.x; k++) {
+      sum += A_s[k-ks] * B[N*k+j];
+    }
   }
   C[N*i+j] = sum;
 }
@@ -23,7 +30,7 @@ int main(int argc, char** argv) {
   MPI_Comm_size(MPI_COMM_WORLD, &size);
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
-  const int N = 1024;
+  const int N = 2048;
   if (N % size != 0) {
     if (rank==0)
       cerr << "num of processes must be exponentitation of 2" << endl;
@@ -44,10 +51,11 @@ int main(int argc, char** argv) {
     }
   }
   int offset = N/size*rank;
+  dim3 grid(N/M, N/size);
 
   double comp_time = 0, comm_time = 0;
   auto tic = chrono::steady_clock::now();
-  submatmul<<<N/size,N>>>(A, B, C, N, offset);
+  submatmul<<<grid,M,M*sizeof(float)>>>(A, B, C, N, offset);
   cudaDeviceSynchronize();
   auto toc = chrono::steady_clock::now();
   comp_time += chrono::duration<double>(toc - tic).count();
