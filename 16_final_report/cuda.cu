@@ -26,9 +26,11 @@ __global__ void submatmul(float *A, float *B, float *C, int N, int offset) {
 
 int main(int argc, char** argv) {
   int size, rank;
+  int ndevice;
   MPI_Init(&argc, &argv);
   MPI_Comm_size(MPI_COMM_WORLD, &size);
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  cudaGetDeviceCount(&ndevice);
 
   const int N = 2048;
   if (N % size != 0) {
@@ -39,6 +41,7 @@ int main(int argc, char** argv) {
   float *A;
   float *B;
   float *C;
+  cudaSetDevice(rank%ndevice);
   cudaMallocManaged(&A,  N * N * sizeof(float));
   cudaMallocManaged(&B,  N * N * sizeof(float));
   cudaMallocManaged(&C,  N * N * sizeof(float));
